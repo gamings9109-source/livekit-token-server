@@ -9,33 +9,47 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/getToken", async (req, res) => {
-  const { room, identity } = req.body;
+// Health check
+app.get("/", (req, res) => {
+  res.send("LiveKit Token Server Running");
+});
 
-  if (!room || !identity) {
-    return res.status(400).json({
-      error: "room and identity required"
+// Token API (GET)
+app.get("/getToken", async (req, res) => {
+  try {
+    const room = req.query.room;
+    const identity = req.query.identity;
+
+    if (!room || !identity) {
+      return res.status(400).json({
+        error: "room and identity required"
+      });
+    }
+
+    const token = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: identity
+      }
+    );
+
+    token.addGrant({
+      roomJoin: true,
+      room: room,
+      canPublish: true,
+      canSubscribe: true
+    });
+
+    res.json({
+      token: await token.toJwt()
+    });
+
+  } catch (e) {
+    res.status(500).json({
+      error: e.toString()
     });
   }
-
-  const token = new AccessToken(
-    process.env.LIVEKIT_API_KEY,
-    process.env.LIVEKIT_API_SECRET,
-    {
-      identity: identity
-    }
-  );
-
-  token.addGrant({
-    roomJoin: true,
-    room: room,
-    canPublish: true,
-    canSubscribe: true
-  });
-
-  res.json({
-    token: await token.toJwt()
-  });
 });
 
 const PORT = process.env.PORT || 3000;
